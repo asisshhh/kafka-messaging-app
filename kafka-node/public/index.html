@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Kafka Messaging</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .status {
+            grid-column: 1 / -1;
+            padding: 0 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            font-size: 13px;
+            color: #666;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-item {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background-color: #4caf50;
+        }
+
+        .status-dot.inactive {
+            background-color: #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .input-section {
+            padding: 30px;
+            border-right: 1px solid #eee;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-send:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-send:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-clear:hover {
+            background: #eeeeee;
+        }
+
+        .message-section {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-section h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .message-count {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 15px;
+        }
+
+        .messages-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 10px;
+        }
+
+        .messages-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .messages-list::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        .messages-list::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+
+        .message-item {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            animation: messageIn 0.3s ease-out;
+        }
+
+        @keyframes messageIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .message-item:hover {
+            background: #f0f1f5;
+        }
+
+        .message-sender {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .message-content {
+            color: #333;
+            font-size: 14px;
+            word-break: break-word;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        .empty-state svg {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        .loading-indicator {
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            border-left: 4px solid #c62828;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            border-left: 4px solid #2e7d32;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .input-section {
+                border-right: none;
+                border-bottom: 1px solid #eee;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .status {
+                flex-direction: column;
+                padding: 15px 20px;
+            }
+
+            .input-section,
+            .message-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>💬 Real-Time Kafka Messaging</h1>
+            <p>Send and receive messages in real-time using Apache Kafka</p>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status">
+            <div class="status-item">
+                <span class="status-dot active" id="serverStatus"></span>
+                Server: <span id="serverStatusText">Connecting...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="wsStatus"></span>
+                WebSocket: <span id="wsStatusText">Connecting...</span>
+            </div>
+            <div class="status-item">
+                Messages Received: <span id="messageCount">0</span>
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="input-section">
+            <h2 style="margin-bottom: 20px; color: #333; font-size: 16px;">Send Message</h2>
+
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <form id="messageForm">
+                <div class="form-group">
+                    <label for="senderName">Your Name</label>
+                    <input
+                        type="text"
+                        id="senderName"
+                        placeholder="Enter your name (optional)"
+                        maxlength="50"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="messageInput">Message</label>
+                    <textarea
+                        id="messageInput"
+                        placeholder="Type your message here..."
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn-send" id="sendBtn">
+                        Send Message
+                        <span class="loading-indicator" id="sendLoader" style="display: none;">
+                            <span class="spinner"></span>
+                        </span>
+                    </button>
+                    <button type="button" class="btn-clear" id="clearBtn">Clear All</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Messages Section -->
+        <div class="message-section">
+            <h2>Received Messages</h2>
+            <div class="message-count">
+                Total: <span id="totalMessages">0</span> messages
+            </div>
+
+            <div class="messages-list" id="messagesList">
+                <div class="empty-state">
+                    <p>No messages yet</p>
+                    <p style="font-size: 12px; margin-top: 5px;">Waiting for messages...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        const WS_URL = `ws://${window.location.host}`;
+
+        // State
+        let messages = [];
+        let ws = null;
+        let isConnected = false;
+
+        // DOM Elements
+        const messageForm = document.getElementById('messageForm');
+        const messageInput = document.getElementById('messageInput');
+        const senderName = document.getElementById('senderName');
+        const sendBtn = document.getElementById('sendBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const messagesList = document.getElementById('messagesList');
+        const messageCount = document.getElementById('messageCount');
+        const totalMessages = document.getElementById('totalMessages');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const sendLoader = document.getElementById('sendLoader');
+        const serverStatus = document.getElementById('serverStatus');
+        const wsStatus = document.getElementById('wsStatus');
+        const wsStatusText = document.getElementById('wsStatusText');
+        const serverStatusText = document.getElementById('serverStatusText');
+
+        // Initialize
+        function init() {
+            setupEventListeners();
+            checkServerHealth();
+            connectWebSocket();
+            loadMessages();
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            messageForm.addEventListener('submit', handleSendMessage);
+            clearBtn.addEventListener('click', handleClearMessages);
+        }
+
+        // Check Server Health
+        async function checkServerHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    serverStatus.classList.add('active');
+                    serverStatusText.textContent = 'Online';
+                }
+            } catch (error) {
+                console.error('Server health check failed:', error);
+                serverStatus.classList.remove('active');
+                serverStatus.classList.add('inactive');
+                serverStatusText.textContent = 'Offline';
+            }
+        }
+
+        // WebSocket Connection
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(WS_URL);
+
+                ws.onopen = () => {
+                    console.log('✓ WebSocket connected');
+                    isConnected = true;
+                    wsStatus.classList.add('active');
+                    wsStatusText.textContent = 'Connected';
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleWebSocketMessage(message);
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    wsStatus.classList.remove('active');
+                    wsStatus.classList.add('inactive');
+                    wsStatusText.textContent = 'Error';
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    isConnected = false;
+                    wsStatus.classList.remove('active');
+                    wsStatus.classList.add('inactive');
+                    wsStatusText.textContent = 'Disconnected';
+
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(connectWebSocket, 3000);
+                };
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+            }
+        }
+
+        // Handle WebSocket Messages
+        function handleWebSocketMessage(message) {
+            if (message.type === 'initial-messages') {
+                messages = message.data;
+                renderMessages();
+            } else if (message.type === 'new-message') {
+                messages.push(message.data);
+                renderMessages();
+            } else if (message.type === 'messages-cleared') {
+                messages = [];
+                renderMessages();
+            }
+        }
+
+        // Load Messages via REST API
+        async function loadMessages() {
+            try {
+                const response = await fetch(`${API_BASE}/api/messages`);
+                if (response.ok) {
+                    const data = await response.json();
+                    messages = data.messages;
+                    renderMessages();
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Send Message
+        async function handleSendMessage(e) {
+            e.preventDefault();
+
+            const content = messageInput.value.trim();
+            const sender = senderName.value.trim() || 'Anonymous';
+
+            if (!content) {
+                showError('Please enter a message');
+                return;
+            }
+
+            // Disable button and show loader
+            sendBtn.disabled = true;
+            sendLoader.style.display = 'inline-block';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content, sender }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+
+                // Clear form
+                messageInput.value = '';
+                messageInput.focus();
+
+                showSuccess('Message sent! ✓');
+                clearMessageNotification(1500);
+
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showError('Failed to send message. Please try again.');
+            } finally {
+                sendBtn.disabled = false;
+                sendLoader.style.display = 'none';
+            }
+        }
+
+        // Clear Messages
+        async function handleClearMessages() {
+            if (!confirm('Are you sure you want to clear all messages?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/clear`, {
+                    method: 'POST',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to clear messages');
+                }
+
+                messages = [];
+                renderMessages();
+                showSuccess('Messages cleared ✓');
+                clearMessageNotification(1500);
+
+            } catch (error) {
+                console.error('Error clearing messages:', error);
+                showError('Failed to clear messages');
+            }
+        }
+
+        // Render Messages
+        function renderMessages() {
+            messageCount.textContent = messages.length;
+            totalMessages.textContent = messages.length;
+
+            if (messages.length === 0) {
+                messagesList.innerHTML = `
+                    <div class="empty-state">
+                        <p>No messages yet</p>
+                        <p style="font-size: 12px; margin-top: 5px;">Waiting for messages...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            messagesList.innerHTML = messages.map((msg) => {
+                const time = new Date(msg.timestamp);
+                const timeStr = time.toLocaleTimeString();
+
+                return `
+                    <div class="message-item">
+                        <div class="message-sender">${escapeHtml(msg.sender)}</div>
+                        <div class="message-content">${escapeHtml(msg.content)}</div>
+                        <div class="message-time">${timeStr}</div>
+                    </div>
+                `;
+            }).reverse().join('');
+
+            // Auto-scroll to bottom
+            messagesList.scrollTop = messagesList.scrollHeight;
+        }
+
+        // Notification Helpers
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+        }
+
+        function clearMessageNotification(timeout = 2000) {
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+                successMessage.style.display = 'none';
+            }, timeout);
+        }
+
+        // Utility: Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load sender name from localStorage
+        function loadSenderName() {
+            const saved = localStorage.getItem('senderName');
+            if (saved) {
+                senderName.value = saved;
+            }
+        }
+
+        // Save sender name to localStorage
+        senderName.addEventListener('change', () => {
+            localStorage.setItem('senderName', senderName.value);
+        });
+
+        // Periodic health check
+        setInterval(checkServerHealth, 10000);
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSenderName();
+            init();
+        });
+    </script>
+</body>
+</html>
